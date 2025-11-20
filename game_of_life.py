@@ -7,7 +7,7 @@ CellCheck = Callable[[int, int], bool]
 Rule = Callable[[CellCheck, int, int], bool]
 StepFunction = Callable[[Grid], Grid]
 
-# a) Regel-Funktionen
+# Regel-Funktionen
 
 def conway_rule(cell_check: CellCheck, x: int, y: int) -> bool:
     """
@@ -43,7 +43,7 @@ def highlife_rule(cell_check: CellCheck, x: int, y: int) -> bool:
     else:
         return alive_neighbors in (3, 6)
 
-# b) Step-Funktion: Erzeugt aus einem Grid das Grid der nächsten Generation.
+# Step-Funktion: Erzeugt aus einem Grid das Grid der nächsten Generation.
 def step_func(rule: Rule) -> StepFunction:
     """
     Erzeugt eine Step-Funktion für ein Grid mit festen Rändern.
@@ -83,7 +83,7 @@ def step_func_torus(rule: Rule) -> StepFunction:
         )
     return step
 
-# c) Generator, der aufeinanderfolgende Generationen produziert.
+# Generator, der aufeinanderfolgende Generationen produziert.
 def generations(start_grid: Grid, step: StepFunction) -> Generator[Grid, None, None]:
     """
     Erzeugt eine (theoretisch unendliche) Folge von Generationen,
@@ -94,7 +94,7 @@ def generations(start_grid: Grid, step: StepFunction) -> Generator[Grid, None, N
         yield grid
         grid = step(grid)
 
-# d) Anzeige-Funktion und Hilfsfunktion zum Erzeugen eines Grids aus Strings.
+# Anzeige-Funktion und Hilfsfunktion zum Erzeugen eines Grids aus Strings.
 def display_grid(grid: Grid) -> None:
     """
     Gibt das Grid in der Konsole aus. Für lebende Zellen wird '#' verwendet, für tote Zellen '.'.
@@ -110,9 +110,9 @@ def grid_from_strings(lines: List[str]) -> Grid:
     """
     return tuple(tuple(c == '#' for c in line) for line in lines)
 
-# e) Testprogramm, das die Bausteine zusammenführt.
+# Test
 def main():
-    # Beispiel-Startkonfiguration: ein Glider
+    # Beispiel-Startkonfiguration
     start = [
         "..........",
         "....#.....",
@@ -123,10 +123,10 @@ def main():
     grid = grid_from_strings(start)
     
     # Auswahl der Regel und der Step-Funktion:
-    rule = conway_rule  # Zum Testen auch highlife_rule möglich.
-    # Verwende für einen fixen Bereich:
+    rule = conway_rule
+    # rule = highlife_rule 
+
     step = step_func(rule)
-    # Alternativ: für eine toroidale Welt
     # step = step_func_torus(rule)
     
     gen = generations(grid, step)
@@ -136,7 +136,7 @@ def main():
         print(f"Generation {i}:")
         current = next(gen)
         display_grid(current)
-        time.sleep(0.5)  # Kurze Pause zwischen den Generationen
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     main()
