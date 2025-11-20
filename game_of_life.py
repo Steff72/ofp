@@ -15,14 +15,16 @@ def conway_rule(cell_check: CellCheck, x: int, y: int) -> bool:
     Lebt eine Zelle weiter, wenn sie aktuell lebt und genau 2 oder 3 lebende Nachbarn hat,
     oder wenn sie aktuell tot ist und genau 3 lebende Nachbarn hat.
     """
-    alive_neighbors = sum(  # True/False als 1/0 gezählt
-        cell_check(x + dx, y + dy)
+    alive_neighbors = sum(
+        1
         for dx in (-1, 0, 1)
         for dy in (-1, 0, 1)
-        if dx or dy  # schließt (0,0) aus
+        if not (dx == 0 and dy == 0) and cell_check(x + dx, y + dy)
     )
-    alive = cell_check(x, y)
-    return (alive and alive_neighbors in (2, 3)) or (not alive and alive_neighbors == 3)
+    if cell_check(x, y):
+        return alive_neighbors in (2, 3)
+    else:
+        return alive_neighbors == 3
 
 def highlife_rule(cell_check: CellCheck, x: int, y: int) -> bool:
     """
@@ -30,14 +32,16 @@ def highlife_rule(cell_check: CellCheck, x: int, y: int) -> bool:
     Eine leblose Zelle wird lebendig, wenn sie genau 3 oder 6 lebende Nachbarn hat,
     ansonsten gilt wie bei Conway.
     """
-    alive_neighbors = sum(  # True/False als 1/0 gezählt
-        cell_check(x + dx, y + dy)
+    alive_neighbors = sum(
+        1
         for dx in (-1, 0, 1)
         for dy in (-1, 0, 1)
-        if dx or dy  # schließt (0,0) aus
+        if not (dx == 0 and dy == 0) and cell_check(x + dx, y + dy)
     )
-    alive = cell_check(x, y)
-    return (alive and alive_neighbors in (2, 3)) or (not alive and alive_neighbors in (3, 6))
+    if cell_check(x, y):
+        return alive_neighbors in (2, 3)
+    else:
+        return alive_neighbors in (3, 6)
 
 # Step-Funktion: Erzeugt aus einem Grid das Grid der nächsten Generation.
 def step_func(rule: Rule) -> StepFunction:
@@ -49,9 +53,8 @@ def step_func(rule: Rule) -> StepFunction:
         n_rows = len(grid)
         n_cols = len(grid[0]) if n_rows > 0 else 0
 
-        # Lebt die Zelle an der Stelle (x, y)?, Closure, das sich grid, n_rows, n_cols merkt
-        def cell_check(x: int, y: int) -> bool: 
-            if 0 <= y < n_rows and 0 <= x < n_cols: # Grenzprüfung
+        def cell_check(x: int, y: int) -> bool:
+            if 0 <= y < n_rows and 0 <= x < n_cols:
                 return grid[y][x]
             return False
 
@@ -72,7 +75,7 @@ def step_func_torus(rule: Rule) -> StepFunction:
         n_cols = len(grid[0]) if n_rows > 0 else 0
 
         def cell_check(x: int, y: int) -> bool:
-            return grid[y % n_rows][x % n_cols]     # Modulo macht wrap-around
+            return grid[y % n_rows][x % n_cols]
 
         return tuple(
             tuple(rule(cell_check, x, y) for x in range(n_cols))
@@ -83,7 +86,7 @@ def step_func_torus(rule: Rule) -> StepFunction:
 # Generator, der aufeinanderfolgende Generationen produziert.
 def generations(start_grid: Grid, step: StepFunction) -> Generator[Grid, None, None]:
     """
-    Erzeugt eine Folge von Generationen,
+    Erzeugt eine (theoretisch unendliche) Folge von Generationen,
     ausgehend von start_grid und unter Anwendung der step-Funktion.
     """
     grid = start_grid
