@@ -597,16 +597,16 @@ if __name__ == "__main__":
     premium_id = bank.open_account("premium")                   # Laufzeit-registriertes Premiumkonto
 
     # Bareinzahlungen
-    bank.deposit_cash(youth_id, 120, "Startguthaben Jugend")
-    bank.deposit_cash(priv_id, 50, "Startguthaben Privat")
+    bank.deposit_cash(youth_id, 100, "Startguthaben Jugend")
+    bank.deposit_cash(priv_id, 100, "Startguthaben Privat")
     bank.deposit_cash(sav_id, 1000, "Startguthaben Sparen")
-    bank.deposit_cash(premium_id, 200, "Startguthaben Premium")
+    bank.deposit_cash(premium_id, 100, "Startguthaben Premium")
 
     # Überweisung (Privat -> Jugend) – es fällt eine Gebühr an
     bank.transfer(priv_id, youth_id, 20, "Taschengeld")
 
     # Überweisung vom dynamischen Premium-Konto (geringere Gebühr als Privatkonto)
-    bank.transfer(premium_id, youth_id, 75, "Premium-Taschengeld")
+    bank.transfer(premium_id, youth_id, 20, "Premium-Taschengeld")
 
     # Versuch einer Überziehung beim Jugendkonto (soll scheitern)
     try:
