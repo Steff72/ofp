@@ -130,7 +130,7 @@ class Account:
             raise BankError("Konto kann nur mit Saldo 0 geschlossen werden.")
         self._active = False
 
-    # Buchungs-API, nur Bank darf posten
+    # Buchungs-API, nur Bank darf posten, Encapsulation, atomare Änderung
     def _post(self, entry: AccountEntry):
         """Nur von der Bank aufrufen: Journal-Eintrag hinzufügen und Saldo anpassen."""
         self._journal.append(entry)
@@ -195,7 +195,7 @@ class PrivateAccount(Account):
         return (f"Private Account (overdraft to -{self._overdraft_limit}, "
                 f"fee={self._fee_percent*100:.2f}% min {self._min_fee})")
 
-    def can_withdraw(self, amount: Decimal) -> bool:
+    def can_withdraw(self, amount: Decimal) -> bool:    # polymorpher Hook
         if amount <= 0:
             return False
         # Überziehung bis -limit erlaubt
@@ -575,18 +575,38 @@ class Bank:
 if __name__ == "__main__":
     bank = Bank()
 
-    # Drei Konten anlegen
+    # Beispiel: neuen Kontotyp zur Laufzeit registrieren (Open-Closed-Prinzip)
+    class PremiumAccount(PrivateAccount):
+        def __init__(self, account_id: str):
+            super().__init__(
+                account_id,
+                overdraft_limit=money(1000),
+                fee_percent=Decimal("0.005"),
+                min_fee=money("0.25")
+            )
+
+        def describe(self) -> str:
+            return "Premium Account (höheres Limit, niedrigere Gebühren)"
+
+    bank.register_account_type("premium", lambda acc_id, **kw: PremiumAccount(acc_id))
+
+    # Vier Konten anlegen (inkl. dynamisch registriertem Premium-Konto)
     youth_id = bank.open_account("youth")                       # Jugendkonto
     priv_id = bank.open_account("private", overdraft_limit=300, fee_percent="0.015", min_fee="0.40")
     sav_id = bank.open_account("savings", rate="0.02")          # Sparkonto mit 2%/Periode
+    premium_id = bank.open_account("premium")                   # Laufzeit-registriertes Premiumkonto
 
     # Bareinzahlungen
     bank.deposit_cash(youth_id, 120, "Startguthaben Jugend")
     bank.deposit_cash(priv_id, 50, "Startguthaben Privat")
     bank.deposit_cash(sav_id, 1000, "Startguthaben Sparen")
+    bank.deposit_cash(premium_id, 200, "Startguthaben Premium")
 
     # Überweisung (Privat -> Jugend) – es fällt eine Gebühr an
     bank.transfer(priv_id, youth_id, 20, "Taschengeld")
+
+    # Überweisung vom dynamischen Premium-Konto (geringere Gebühr als Privatkonto)
+    bank.transfer(premium_id, youth_id, 75, "Premium-Taschengeld")
 
     # Versuch einer Überziehung beim Jugendkonto (soll scheitern)
     try:
@@ -602,6 +622,7 @@ if __name__ == "__main__":
     print(bank.describe_account(youth_id))
     print(bank.describe_account(priv_id))
     print(bank.describe_account(sav_id))
+    print(bank.describe_account(premium_id))
 
     # Letzte Einträge eines Kontos
     print("\nLetzte Buchungen Jugendkonto:")
