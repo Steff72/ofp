@@ -33,14 +33,15 @@ Game of Life
 Ziel:
   - Simulation von Conways Game of Life auf einem Grid
   - Auswahl zwischen Conway-Regel (Standard) und HighLife-Variante
-  - Unterschiedliche Weltmodelle: fester Rand oder toroidales Wrap-around
+  - Unendliches Grid, gespeichert als Menge lebender Zellen (Alive-Set)
 
 Bausteine (`game_of_life.py`):
   - `conway_rule` / `highlife_rule`: bestimmen für jede Zelle den nächsten Zustand
-  - `step_func` (fester Rand) und `step_func_torus` (toroidal): erzeugen Schritt-Funktionen auf Basis der gewählten Regel
+  - `step_func`: Factory für eine Step-Funktion auf Basis der gewählten Regel
   - `generations`: Generator, der fortlaufend neue Generationen liefert
-  - `grid_from_strings` und `display_grid`: Hilfen zum Erzeugen/Ausgeben von Grids
+  - `alive_from_strings`: wandelt ASCII-Patterns in ein Alive-Set um
+  - `display` / `bbox`: Ausgabe eines Ausschnitts via Bounding Box
 
 Ausführen:
-  - `python3 game_of_life.py` startet die Demo mit einem Glider und simuliert 10 Generationen (0,5 s Pause)
-  - Regel oder Weltmodell im `main()`-Block anpassen (z.B. `rule = highlife_rule`, `step = step_func_torus(rule)`)
+  - `python3 game_of_life.py` startet die Demo und simuliert 50 Generationen (0,5 s Pause)
+  - Regel im `main()`-Block anpassen (z.B. `rule = highlife_rule`)

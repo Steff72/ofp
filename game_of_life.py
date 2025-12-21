@@ -1,141 +1,100 @@
-from typing import Callable, Tuple, List, Generator
+from __future__ import annotations
+from typing import Callable, FrozenSet, Iterable, Iterator, Tuple, List
 import time
 
-# Typ-Alias-Definitionen
-Grid = Tuple[Tuple[bool, ...], ...]
-CellCheck = Callable[[int, int], bool]
-Rule = Callable[[CellCheck, int, int], bool]
-StepFunction = Callable[[Grid], Grid]
+# Typen (unendliches Grid als Menge lebender Zellen)
+Cell = Tuple[int, int]
+Alive = FrozenSet[Cell]                 # immutable (funktional)
+Rule = Callable[[bool, int], bool]      # (is_alive_now, alive_neighbor_count) -> is_alive_next
 
-# Regel-Funktionen
+NEIGH: Tuple[Cell, ...] = tuple(
+    (dx, dy)
+    for dx in (-1, 0, 1)
+    for dy in (-1, 0, 1)
+    if (dx, dy) != (0, 0)
+)
 
-def conway_rule(cell_check: CellCheck, x: int, y: int) -> bool:
-    """
-    Berechnet den nächsten Zustand einer Zelle gemäß Conways Regel.
-    Lebt eine Zelle weiter, wenn sie aktuell lebt und genau 2 oder 3 lebende Nachbarn hat,
-    oder wenn sie aktuell tot ist und genau 3 lebende Nachbarn hat.
-    """
-    alive_neighbors = sum(
-        1
-        for dx in (-1, 0, 1)
-        for dy in (-1, 0, 1)
-        if not (dx == 0 and dy == 0) and cell_check(x + dx, y + dy)
-    )
-    if cell_check(x, y):
-        return alive_neighbors in (2, 3)
-    else:
-        return alive_neighbors == 3
+# Regeln (pure functions)
+def conway_rule(is_alive: bool, n: int) -> bool:
+    return (n == 3) or (is_alive and n == 2)
 
-def highlife_rule(cell_check: CellCheck, x: int, y: int) -> bool:
-    """
-    Alternative Regel (HighLife):
-    Eine leblose Zelle wird lebendig, wenn sie genau 3 oder 6 lebende Nachbarn hat,
-    ansonsten gilt wie bei Conway.
-    """
-    alive_neighbors = sum(
-        1
-        for dx in (-1, 0, 1)
-        for dy in (-1, 0, 1)
-        if not (dx == 0 and dy == 0) and cell_check(x + dx, y + dy)
-    )
-    if cell_check(x, y):
-        return alive_neighbors in (2, 3)
-    else:
-        return alive_neighbors in (3, 6)
+def highlife_rule(is_alive: bool, n: int) -> bool:
+    return (n in (3, 6)) or (is_alive and n == 2)
 
-# Step-Funktion: Erzeugt aus einem Grid das Grid der nächsten Generation.
-def step_func(rule: Rule) -> StepFunction:
-    """
-    Erzeugt eine Step-Funktion für ein Grid mit festen Rändern.
-    Außerhalb des Grids wird stets angenommen, dass die Zellen tot sind.
-    """
-    def step(grid: Grid) -> Grid:
-        n_rows = len(grid)
-        n_cols = len(grid[0]) if n_rows > 0 else 0
+# Kernlogik: unendlicher Step über Alive-Set
+def neighbors(c: Cell) -> Iterable[Cell]:
+    x, y = c
+    return ((x + dx, y + dy) for dx, dy in NEIGH)
 
-        def cell_check(x: int, y: int) -> bool:
-            if 0 <= y < n_rows and 0 <= x < n_cols:
-                return grid[y][x]
-            return False
+def step_func(rule: Rule) -> Callable[[Alive], Alive]:
+    """
+    Factory: gibt eine Step-Funktion zurück, parametrisiert mit 'rule'.
+    Welt ist unendlich, gespeichert werden nur lebende Zellen (Alive-Set).
+    """
+    def step(alive: Alive) -> Alive:
+        candidates = frozenset(alive | frozenset(n for c in alive for n in neighbors(c)))
 
-        return tuple(
-            tuple(rule(cell_check, x, y) for x in range(n_cols))
-            for y in range(n_rows)
+        def n_alive(c: Cell) -> int:
+            return sum((n in alive) for n in neighbors(c))
+
+        return frozenset(
+            c for c in candidates
+            if rule((c in alive), n_alive(c))
         )
     return step
 
-# Alternative Weltenvariante: Toroidale Welt (wrap-around)
-def step_func_torus(rule: Rule) -> StepFunction:
-    """
-    Erzeugt eine Step-Funktion für ein toroidales Grid.
-    Dabei werden Zellen am rechten Rand mit denen am linken Rand (und oben/unten) verbunden.
-    """
-    def step(grid: Grid) -> Grid:
-        n_rows = len(grid)
-        n_cols = len(grid[0]) if n_rows > 0 else 0
-
-        def cell_check(x: int, y: int) -> bool:
-            return grid[y % n_rows][x % n_cols]
-
-        return tuple(
-            tuple(rule(cell_check, x, y) for x in range(n_cols))
-            for y in range(n_rows)
-        )
-    return step
-
-# Generator, der aufeinanderfolgende Generationen produziert.
-def generations(start_grid: Grid, step: StepFunction) -> Generator[Grid, None, None]:
-    """
-    Erzeugt eine (theoretisch unendliche) Folge von Generationen,
-    ausgehend von start_grid und unter Anwendung der step-Funktion.
-    """
-    grid = start_grid
+# Generator, unendliche Generationen
+def generations(start: Alive, step: Callable[[Alive], Alive]) -> Iterator[Alive]:
+    alive = start
     while True:
-        yield grid
-        grid = step(grid)
+        yield alive
+        alive = step(alive)
 
-# Anzeige-Funktion und Hilfsfunktion zum Erzeugen eines Grids aus Strings.
-def display_grid(grid: Grid) -> None:
-    """
-    Gibt das Grid in der Konsole aus. Für lebende Zellen wird '#' verwendet, für tote Zellen '.'.
-    """
-    for row in grid:
-        print(''.join('#' if cell else '.' for cell in row))
-    print()  # Leere Zeile zur Trennung
+# Parsing & Anzeige (Ausschnitt automatisch via Bounding Box)
+def alive_from_strings(lines: List[str], origin: Cell = (0, 0), live_char: str = "#") -> Alive:
+    ox, oy = origin
+    return frozenset(
+        (ox + x, oy + y)
+        for y, row in enumerate(lines)
+        for x, ch in enumerate(row)
+        if ch == live_char
+    )
 
-def grid_from_strings(lines: List[str]) -> Grid:
-    """
-    Wandelt eine Liste von Strings in ein Grid um.
-    Das Zeichen '#' repräsentiert eine lebende Zelle, alle anderen Zeichen werden als tot gewertet.
-    """
-    return tuple(tuple(c == '#' for c in line) for line in lines)
+def bbox(alive: Alive, pad: int = 1) -> Tuple[int, int, int, int]:
+    xs = [x for x, _ in alive]
+    ys = [y for _, y in alive]
+    return (min(xs) - pad, max(xs) + pad, min(ys) - pad, max(ys) + pad)
 
-# Test
-def main():
-    # Beispiel-Startkonfiguration
+def display(alive: Alive, pad: int = 2, live: str = "#", dead: str = ".") -> None:
+    if not alive:
+        print("(empty)\n")
+        return
+    minx, maxx, miny, maxy = bbox(alive, pad=pad)
+    print("\n".join(
+        "".join(live if (x, y) in alive else dead for x in range(minx, maxx + 1))
+        for y in range(miny, maxy + 1)
+    ))
+    print()
+
+# Demo
+def main() -> None:
+    # Startkonfig
     start = [
         "..........",
-        "....#.....",
-        "...##.....",
-        "...#......",
+        "....###...",
+        "...###....",
+        "..###.....",
         "..........",
     ]
-    grid = grid_from_strings(start)
-    
-    # Auswahl der Regel und der Step-Funktion:
-    rule = conway_rule
-    # rule = highlife_rule 
+    alive0 = alive_from_strings(start)
 
+    rule = conway_rule          # oder: highlife_rule
     step = step_func(rule)
-    # step = step_func_torus(rule)
-    
-    gen = generations(grid, step)
-    
-    # Simuliere 10 Generationen
-    for i in range(10):
+    gen = generations(alive0, step)
+
+    for i in range(50):
         print(f"Generation {i}:")
-        current = next(gen)
-        display_grid(current)
+        display(next(gen), pad=2)
         time.sleep(0.5)
 
 if __name__ == "__main__":
